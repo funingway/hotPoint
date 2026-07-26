@@ -1,0 +1,79 @@
+# {{ meta.topic }} 自媒体选题调研报告
+
+> 生成时间: {{ meta.created_at.isoformat() }} | 时间窗: {{ meta.hours }}h | 候选: {{ meta.item_count }}篇 | 对比: {{ meta.comparison_count }}次 | 耗时: {{ "%.1f"|format(meta.elapsed_sec) }}s
+{% if meta.degraded %}
+> ⚠️ **降级模式运行**：Ollama 不可达，仅按 metrics 排序，未完成 LLM 评估
+{% endif %}
+
+## 一、执行摘要
+
+- 话题：{{ meta.topic }}
+- 候选内容：{{ meta.item_count }} 篇
+- 对比次数：{{ meta.comparison_count }}
+- 主题数：{{ themes|length }}
+
+### 数据源运行状态
+
+| 源 | 状态 | 抓取数 | 错误 |
+|---|---|---|---|
+{% for s in source_statuses -%}
+| {{ s.source }} | {{ s.status }} | {{ s.fetched_count }} | {{ s.error or "" }} |
+{% endfor %}
+
+## 二、主题概览
+
+| 主题 | 描述 | 候选数 | 热度 |
+|---|---|---|---|
+{% for t in themes|sort(attribute='heat_score', reverse=true) -%}
+| {{ t.name }} | {{ t.description }} | {{ t.item_ids|length }} | {{ t.heat_score }} |
+{% endfor %}
+
+## 三、选题建议
+
+{% for t in themes|sort(attribute='heat_score', reverse=true) %}
+### 主题：{{ t.name }}
+
+{% set sugs = suggestions_by_theme.get(t.name, []) %}
+{% for s in sugs %}
+#### 建议 {{ loop.index }}：{{ s.title }}
+
+- **切入角度**：{{ s.angle }}
+- **钩子**：{{ s.hook }}
+- **核心论点**：
+{% for p in s.key_points %}  - {{ p }}
+{% endfor %}
+- **目标受众**：{{ s.target_audience }}
+- **视觉化建议**：{{ s.visual_hint }}
+- **支撑内容**：{{ s.evidence_ids|join(", ") }}
+- **标签**：{{ s.freshness_tag }} | 价值分：{{ s.estimated_value }}
+
+{% endfor %}
+{% endfor %}
+
+## 四、Top 20 内容排行（Elo 排序）
+
+| 排名 | 标题 | 源 | Elo | URL |
+|---|---|---|---|---|
+{% for it in top_items -%}
+| {{ loop.index }} | {{ it.title }} | {{ it.source }} | {{ it.elo }} | [链接]({{ it.url }}) |
+{% endfor %}
+
+## 五、对比观察精选
+
+{% for c in comparison_observations %}
+- {{ c.winner }} 胜：{{ c.reason }}
+{% endfor %}
+
+## 六、完整候选列表
+
+| 标题 | 源 | Elo | URL |
+|---|---|---|---|
+{% for it in all_items -%}
+| {{ it.title }} | {{ it.source }} | {{ it.elo }} | [链接]({{ it.url }}) |
+{% endfor %}
+
+## 附录：运行参数
+
+```json
+{{ config_snapshot | tojson(indent=2) }}
+```
