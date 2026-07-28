@@ -31,7 +31,11 @@ def make_item(item_id, title="T", elo=1000, content="content"):
 
 
 @pytest.mark.asyncio
-async def test_run_comparisons_updates_elo():
+async def test_run_comparisons_updates_elo(monkeypatch):
+    # 让 random.choice 总是返回第一个元素，使 pick_opponents 顺序确定
+    import hotspot.pipeline.elo as elo_mod
+    monkeypatch.setattr(elo_mod.random, "choice", lambda seq: seq[0])
+
     items = [make_item("a"), make_item("b")]
     client = MockOllamaClient([
         {"winner": "A", "reason": "A fresh", "a_score": 90, "b_score": 50},

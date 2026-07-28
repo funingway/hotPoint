@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hotPoint · 热点搜索</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,0..100&family=DM+Sans:opsz,wght@9..40,300..700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- 背景氛围层 -->
+<div class="bg-gradient"></div>
+<div class="bg-grid"></div>
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+<div class="grain"></div>
+
+<main class="search-stage">
+
+  <!-- ============ 顶栏 ============ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-mark">◈</span>
+        <span class="brand-name">hotPoint</span>
+      </div>
+    </div>
+    <nav class="topbar-nav">
+      <button class="nav-tab active" data-tab="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        搜索
+      </button>
+      <button class="nav-tab" data-tab="reports">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        报告档案
+      </button>
+      <button class="nav-tab" data-tab="sources">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        数据源
+      </button>
+      <button class="nav-tab" data-tab="settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        设置
+      </button>
+    </nav>
+    <div class="topbar-right">
+      <div class="status-pill" id="ollama-pill" title="Ollama 服务状态">
+        <span class="pill-dot" id="ollama-dot"></span>
+        <span id="ollama-status">检测中</span>
+      </div>
+      <div class="status-pill" id="job-pill" title="任务状态">
+        <span class="pill-dot" id="job-dot"></span>
+        <span id="job-status">空闲</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ 搜索面板 ============ -->
+  <section id="tab-search" class="panel active">
+
+    <!-- Hero 搜索区 -->
+    <div class="hero" id="hero">
+      <h1 class="hero-title">
+        <span class="title-line">追踪全网</span>
+        <span class="title-line title-accent">热点脉搏</span>
+      </h1>
+      <p class="hero-sub">论文 · 新闻 · 博客 · GitHub · 由本地 LLM 养蛊式排序</p>
+
+      <form id="run-form" class="search-form">
+        <div class="search-box">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+          </svg>
+          <input type="text" id="topic" placeholder="输入话题：AGI · 世界模型 · LLM agent" required autocomplete="off">
+          <button type="submit" id="run-btn" class="search-btn">
+            <span class="btn-label">搜索</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- 快捷参数行 -->
+        <div class="quick-params">
+          <div class="param-chip">
+            <span class="param-label">时间窗</span>
+            <input type="number" id="hours" value="24" min="1" max="168">
+            <span class="param-unit">h</span>
+          </div>
+          <div class="param-chip param-toggle" id="advanced-toggle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            高级选项
+          </div>
+          <div class="param-chip param-toggle" id="no-fulltext-chip">
+            <input type="checkbox" id="no_fulltext">
+            <span>跳过全文</span>
+          </div>
+        </div>
+
+        <!-- 高级选项（折叠） -->
+        <div class="advanced-panel" id="advanced-panel">
+          <div class="adv-row">
+            <div class="adv-field">
+              <label>对比上限</label>
+              <input type="number" id="max_comparisons" min="1" placeholder="自动">
+            </div>
+            <div class="adv-field">
+              <label>Top K</label>
+              <input type="number" id="top_k" min="1" placeholder="20">
+            </div>
+          </div>
+          <div class="adv-field">
+            <label>数据源（不选 = 全部）</label>
+            <div id="sources-list" class="sources-row"></div>
+          </div>
+        </div>
+      </form>
+
+      <!-- 快捷话题 -->
+      <div class="suggestions">
+        <span class="sug-label">试试：</span>
+        <button class="sug-chip" onclick="quickSearch('AGI')">AGI</button>
+        <button class="sug-chip" onclick="quickSearch('world model')">世界模型</button>
+        <button class="sug-chip" onclick="quickSearch('LLM agent')">LLM Agent</button>
+        <button class="sug-chip" onclick="quickSearch('embodied AI')">具身智能</button>
+        <button class="sug-chip" onclick="quickSearch('reasoning')">推理能力</button>
+      </div>
+    </div>
+
+    <!-- 进度卡片（搜索后浮现） -->
+    <div class="progress-card" id="progress-card" style="display:none;">
+      <div class="pc-header">
+        <div class="pc-title">
+          <span class="pc-spinner" id="pc-spinner"></span>
+          <h2 id="progress-stage">准备中</h2>
+        </div>
+        <div class="pc-header-right">
+          <span class="pc-pct" id="progress-percent">0%</span>
+          <button id="stop-btn" class="btn btn-stop" onclick="cancelRun()" title="停止当前任务">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            <span>停止</span>
+          </button>
+        </div>
+      </div>
+      <div class="pc-bar">
+        <div class="pc-fill" id="progress-fill"></div>
+      </div>
+      <div class="pc-meta" id="progress-meta"></div>
+      <div class="pc-error" id="progress-error"></div>
+      <div class="pc-result" id="progress-result"></div>
+
+      <!-- 事件流面板 -->
+      <div class="event-panel" id="event-panel">
+        <div class="event-panel-head">
+          <span class="ep-title">实时过程</span>
+          <label class="ep-autoscroll">
+            <input type="checkbox" id="ep-autoscroll-check" checked>
+            <span>自动滚动</span>
+          </label>
+          <button class="ep-clear" id="ep-clear-btn" onclick="clearEvents()">清空</button>
+        </div>
+        <div class="event-list" id="event-list">
+          <div class="event-empty">等待任务开始…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 报告档案 ============ -->
+  <section id="tab-reports" class="panel">
+    <div class="content-wrap">
+      <header class="content-head">
+        <div>
+          <span class="content-kicker">ARCHIVE</span>
+          <h2>报告档案库</h2>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadReports()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          刷新
+        </button>
+      </header>
+      <div class="reports-list" id="reports-list">
+        <div class="empty-state">加载中...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 数据源管理 ============ -->
+  <section id="tab-sources" class="panel">
+    <div class="content-wrap">
+      <header class="content-head">
+        <div>
+          <span class="content-kicker">SOURCES</span>
+          <h2>数据源管理</h2>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showAddSourceForm()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          添加自定义源
+        </button>
+      </header>
+      <p class="content-lede">添加任意 RSS/Atom Feed 或网页作为数据源。支持 <code>{topic}</code> 占位符注入话题关键词。</p>
+
+      <!-- 添加/编辑表单 -->
+      <div id="source-form-card" class="source-form-card" style="display:none;">
+        <h3 id="source-form-title">添加自定义源</h3>
+        <div class="source-form-grid">
+          <div class="adv-field">
+            <label>名称 *</label>
+            <input type="text" id="src-name" placeholder="techcrunch">
+          </div>
+          <div class="adv-field">
+            <label>类型</label>
+            <select id="src-type">
+              <option value="news">新闻</option>
+              <option value="blog">博客</option>
+              <option value="paper">论文</option>
+              <option value="github">GitHub</option>
+            </select>
+          </div>
+          <div class="adv-field adv-field-url">
+            <label>URL * <span class="hint">支持 <code>{topic}</code> 占位符</span></label>
+            <input type="text" id="src-url" placeholder="https://example.com/feed?q={topic}">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary btn-sm" onclick="testCustomSource()" id="test-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+            测试
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveCustomSource()">
+            保存
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="hideAddSourceForm()">取消</button>
+          <span id="test-result" class="test-result"></span>
+        </div>
+      </div>
+
+      <!-- 内置源列表 -->
+      <h3 class="section-subtitle">内置数据源</h3>
+      <div id="builtin-sources" class="sources-grid-view">
+        <div class="empty-state">加载中...</div>
+      </div>
+
+      <!-- 自定义源列表 -->
+      <h3 class="section-subtitle">自定义数据源</h3>
+      <div id="custom-sources" class="sources-grid-view">
+        <div class="empty-state">加载中...</div>
+      </div>
+
+      <!-- 帮助提示 -->
+      <details class="help-block">
+        <summary>如何找到网站的 RSS 链接？</summary>
+        <div class="help-content">
+          <p><b>常见 RSS 路径：</b></p>
+          <ul>
+            <li><code>/feed</code>、<code>/rss</code>、<code>/feed.xml</code>、<code>/index.xml</code></li>
+            <li><code>/blog/feed</code>、<code>/posts/rss</code></li>
+            <li>WordPress 站点：<code>/feed/</code></li>
+            <li>Substack：<code>https://xxx.substack.com/feed</code></li>
+            <li>Medium：<code>https://medium.com/feed/tag/{topic}</code></li>
+          </ul>
+          <p><b>查找方法：</b> 在网页源码中搜索 <code>application/rss+xml</code> 或 <code>application/atom+xml</code>。</p>
+          <p><b>占位符示例：</b> <code>https://example.com/search?q={topic}&format=rss</code>，抓取时会自动替换 <code>{topic}</code> 为搜索关键词。</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 设置 ============ -->
+  <section id="tab-settings" class="panel">
+    <div class="content-wrap">
+      <header class="content-head">
+        <div>
+          <span class="content-kicker">CONFIG</span>
+          <h2>配置手册</h2>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-sm" onclick="loadConfig()">重新加载</button>
+          <button class="btn btn-primary btn-sm" onclick="saveConfig()">保存</button>
+        </div>
+      </header>
+      <p class="content-lede">直接编辑 config.yaml 的 JSON 投影，保存后立即生效。</p>
+      <div class="editor-wrap">
+        <div class="editor-gutter" id="editor-gutter"></div>
+        <textarea id="config-editor" spellcheck="false" wrap="off"></textarea>
+      </div>
+      <span id="config-msg" class="msg"></span>
+    </div>
+  </section>
+
+</main>
+
+<!-- Toast -->
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+// ============================================================
+// Tab 切换
+// ============================================================
+const tabs = document.querySelectorAll('.nav-tab');
+const panels = document.querySelectorAll('.panel');
+tabs.forEach(t => {
+  t.onclick = () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    panels.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'reports') loadReports();
+    if (t.dataset.tab === 'settings') loadConfig();
+    if (t.dataset.tab === 'sources') loadAllSources();
+  };
+});
+
+// 高级选项折叠
+document.getElementById('advanced-toggle').onclick = () => {
+  const p = document.getElementById('advanced-panel');
+  p.classList.toggle('open');
+  document.getElementById('advanced-toggle').classList.toggle('active');
+};
+
+// 快捷搜索
+function quickSearch(topic) {
+  document.getElementById('topic').value = topic;
+  document.getElementById('run-form').dispatchEvent(new Event('submit', {cancelable: true}));
+}
+
+// ============================================================
+// Toast
+// ============================================================
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-show'));
+  setTimeout(() => {
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 400);
+  }, 3500);
+}
+
+// ============================================================
+// Ollama 状态
+// ============================================================
+async function checkOllama() {
+  const dot = document.getElementById('ollama-dot');
+  const txt = document.getElementById('ollama-status');
+  const pill = document.getElementById('ollama-pill');
+  try {
+    const r = await fetch('/api/ollama/status');
+    const d = await r.json();
+    pill.classList.remove('pill-ok', 'pill-warn', 'pill-pending');
+    if (d.running) {
+      if (d.model_ready) {
+        pill.classList.add('pill-ok');
+        txt.textContent = 'Ollama 就绪';
+      } else {
+        pill.classList.add('pill-warn');
+        txt.textContent = '模型未下载';
+      }
+    } else {
+      pill.classList.add('pill-warn');
+      txt.textContent = 'Ollama 离线';
+    }
+  } catch (e) {
+    pill.classList.add('pill-warn');
+    txt.textContent = 'Ollama 离线';
+  }
+}
+
+// ============================================================
+// 任务状态
+// ============================================================
+function updateJobPill(status, stage) {
+  const dot = document.getElementById('job-dot');
+  const txt = document.getElementById('job-status');
+  const pill = document.getElementById('job-pill');
+  pill.classList.remove('pill-ok', 'pill-warn', 'pill-pending', 'pill-running');
+  const map = {
+    idle:    ['pill-idle', '空闲'],
+    pending: ['pill-pending', '等待中'],
+    running: ['pill-running', stage || '运行中'],
+    done:    ['pill-ok', '已完成'],
+    failed:  ['pill-warn', '失败'],
+  };
+  const [cls, label] = map[status] || ['pill-idle', '空闲'];
+  pill.classList.add(cls);
+  txt.textContent = label;
+}
+
+// ============================================================
+// 数据源
+// ============================================================
+async function loadSources() {
+  const r = await fetch('/api/sources');
+  const sources = await r.json();
+  const el = document.getElementById('sources-list');
+  el.innerHTML = sources.map(s => `
+    <label class="source-tag">
+      <input type="checkbox" value="${s.name}" checked>
+      <span>${s.name}</span>
+    </label>
+  `).join('');
+}
+
+// ============================================================
+// 抓取表单
+// ============================================================
+document.getElementById('run-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { toast('请输入话题关键词', 'warn'); return; }
+
+  const hours = parseInt(document.getElementById('hours').value) || 24;
+  const maxComp = document.getElementById('max_comparisons').value;
+  const topK = document.getElementById('top_k').value;
+  const noFull = document.getElementById('no_fulltext').checked;
+  const sources = Array.from(document.querySelectorAll('#sources-list input:checked')).map(x => x.value);
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  try {
+    const r = await fetch('/api/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        topic, hours,
+        sources: sources.length ? sources : null,
+        max_comparisons: maxComp ? parseInt(maxComp) : null,
+        top_k: topK ? parseInt(topK) : null,
+        no_fulltext: noFull,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      toast('启动失败: ' + (err.detail || r.status), 'error');
+      return;
+    }
+    const d = await r.json();
+    toast(`已派发任务 · ${d.run_id.slice(0, 8)}`, 'ok');
+    // 收起 hero，展开进度卡片，重置事件流
+    document.getElementById('hero').classList.add('hero-collapsed');
+    document.getElementById('progress-card').style.display = 'block';
+    document.getElementById('pc-spinner').classList.remove('done');
+    document.getElementById('progress-result').textContent = '';
+    document.getElementById('progress-error').textContent = '';
+    document.getElementById('progress-error').style.display = 'none';
+    document.getElementById('stop-btn').disabled = false;
+    lastEventId = 0;
+    eventCount = 0;
+    document.getElementById('event-list').innerHTML =
+      '<div class="event-empty">任务已派发，等待事件…</div>';
+    pollStatus();
+  } catch (e) {
+    toast('请求失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+};
+
+// ============================================================
+// 进度轮询（增量事件流）
+// ============================================================
+let pollTimer = null;
+let lastEventId = 0;
+let eventCount = 0;
+
+async function pollStatus() {
+  if (pollTimer) clearInterval(pollTimer);
+  const check = async () => {
+    try {
+      const r = await fetch('/api/run/status?since=' + lastEventId);
+      const d = await r.json();
+      updateProgress(d);
+      if (Array.isArray(d.events) && d.events.length) {
+        d.events.forEach(ev => {
+          renderEvent(ev);
+          if (ev.id > lastEventId) lastEventId = ev.id;
+        });
+      }
+      if (d.last_event_id && d.last_event_id > lastEventId) {
+        lastEventId = d.last_event_id;
+      }
+      const finished = ['done', 'failed', 'cancelled'].includes(d.status);
+      if (finished) {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        const btn = document.getElementById('run-btn');
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        document.getElementById('pc-spinner').classList.add('done');
+        document.getElementById('stop-btn').disabled = true;
+        if (d.status === 'done') toast('情报采集完成', 'ok');
+        else if (d.status === 'failed') toast('任务失败: ' + (d.error || ''), 'error');
+        else if (d.status === 'cancelled') toast('任务已停止', 'warn');
+      }
+    } catch (e) {}
+  };
+  check();
+  pollTimer = setInterval(check, 1200);
+}
+
+function updateProgress(d) {
+  if (d.status === 'idle') {
+    updateJobPill('idle');
+    return;
+  }
+  updateJobPill(d.status, d.stage);
+
+  document.getElementById('progress-stage').textContent = d.stage || '';
+  const pct = d.progress || 0;
+  document.getElementById('progress-percent').textContent = pct + '%';
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  const stopBtn = document.getElementById('stop-btn');
+  const isActive = ['pending', 'running'].includes(d.status);
+  stopBtn.disabled = !isActive;
+
+  const meta = document.getElementById('progress-meta');
+  if (d.started_at) {
+    const dur = d.finished_at
+      ? ((new Date(d.finished_at) - new Date(d.started_at)) / 1000).toFixed(1) + 's'
+      : '进行中…';
+    meta.textContent = `话题: ${d.topic}  ·  窗口: ${d.hours}h  ·  耗时: ${dur}`;
+  }
+
+  const errEl = document.getElementById('progress-error');
+  errEl.textContent = d.error ? '✕ ' + d.error : '';
+  errEl.style.display = d.error ? 'block' : 'none';
+
+  const resEl = document.getElementById('progress-result');
+  if (d.result && d.status === 'done') {
+    resEl.innerHTML = `<a href="/reports/${d.run_id}" class="result-link">
+      <span>查阅完整报告</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+    <div class="result-stats">抓取 <b>${d.result.item_count}</b> 篇 · <b>${d.result.comparison_count}</b> 次对比${d.result.degraded ? ' · 降级模式' : ''}</div>`;
+  } else {
+    resEl.textContent = '';
+  }
+}
+
+// ============================================================
+// 事件流渲染
+// ============================================================
+const EVENT_LABELS = {
+  fetch:   { tag: '抓取',   cls: 'ev-fetch' },
+  dedupe:  { tag: '去重',   cls: 'ev-dedupe' },
+  fulltext:{ tag: '全文',   cls: 'ev-fulltext' },
+  compare: { tag: '对比',   cls: 'ev-compare' },
+  cluster: { tag: '聚类',   cls: 'ev-cluster' },
+  suggest: { tag: '选题',   cls: 'ev-suggest' },
+  render:  { tag: '渲染',   cls: 'ev-render' },
+  system:  { tag: '系统',   cls: 'ev-system' },
+  error:   { tag: '错误',   cls: 'ev-error' },
+};
+
+function renderEvent(ev) {
+  eventCount++;
+  const list = document.getElementById('event-list');
+  // 清掉空状态
+  if (list.querySelector('.event-empty')) list.innerHTML = '';
+
+  const cfg = EVENT_LABELS[ev.kind] || { tag: ev.kind, cls: 'ev-system' };
+  const ts = new Date(ev.ts).toLocaleTimeString('zh-CN', { hour12: false });
+  const row = document.createElement('div');
+  row.className = 'event-row ' + cfg.cls;
+  row.dataset.kind = ev.kind;
+
+  let extra = '';
+  if (ev.kind === 'compare' && ev.winner_title) {
+    extra = `<div class="ev-detail">
+      <span class="ev-score">A:${ev.a_score ?? 0} B:${ev.b_score ?? 0}</span>
+      <span class="ev-winner">胜: ${escapeHtml(ev.winner_title.slice(0, 50))}</span>
+    </div>`;
+    if (ev.reason) {
+      extra += `<div class="ev-reason">理由: ${escapeHtml(ev.reason.slice(0, 160))}</div>`;
+    }
+  } else if (ev.kind === 'cluster' && ev.themes) {
+    extra = `<div class="ev-detail">${
+      ev.themes.map(t => `<span class="ev-chip">${escapeHtml(t.name)} · ${t.count}篇</span>`).join('')
+    }</div>`;
+  } else if (ev.kind === 'suggest' && ev.title) {
+    extra = `<div class="ev-detail">
+      <span class="ev-chip ev-chip-value">价值 ${ev.estimated_value ?? 0}</span>
+      <span class="ev-chip">${escapeHtml(ev.freshness_tag || '')}</span>
+    </div>`;
+  } else if (ev.kind === 'fetch' && typeof ev.count === 'number') {
+    extra = `<div class="ev-detail"><span class="ev-chip">${ev.count} 条</span></div>`;
+  }
+
+  row.innerHTML = `
+    <div class="ev-left">
+      <span class="ev-tag">${cfg.tag}</span>
+      <span class="ev-ts">${ts}</span>
+    </div>
+    <div class="ev-body">
+      <div class="ev-msg">${escapeHtml(ev.message || '')}</div>
+      ${extra}
+    </div>
+  `;
+  list.appendChild(row);
+
+  // 控制条目上限，避免内存膨胀
+  while (list.children.length > 400) {
+    list.removeChild(list.firstChild);
+  }
+
+  if (document.getElementById('ep-autoscroll-check').checked) {
+    list.scrollTop = list.scrollHeight;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function clearEvents() {
+  const list = document.getElementById('event-list');
+  list.innerHTML = '<div class="event-empty">已清空</div>';
+  eventCount = 0;
+}
+
+// ============================================================
+// 停止任务
+// ============================================================
+async function cancelRun() {
+  const btn = document.getElementById('stop-btn');
+  if (btn.disabled) return;
+  if (!confirm('确定要停止当前任务？')) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/run/cancel', { method: 'POST' });
+    if (r.ok) {
+      toast('已请求停止，等待当前步骤退出…', 'warn');
+    } else {
+      const err = await r.json().catch(() => ({}));
+      toast('停止失败: ' + (err.detail || r.status), 'error');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    toast('请求失败: ' + e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+// ============================================================
+// 数据源管理
+// ============================================================
+async function loadAllSources() {
+  loadBuiltinSources();
+  loadCustomSources();
+}
+
+async function loadBuiltinSources() {
+  const el = document.getElementById('builtin-sources');
+  try {
+    const r = await fetch('/api/sources');
+    const sources = await r.json();
+    const builtin = sources.filter(s => s.type === 'builtin');
+    el.innerHTML = builtin.map(s => `
+      <div class="source-card source-builtin">
+        <div class="sc-head">
+          <span class="sc-name">${s.name}</span>
+          <span class="sc-badge sc-badge-builtin">内置</span>
+        </div>
+        <div class="sc-meta">类型: ${s.name}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+  }
+}
+
+async function loadCustomSources() {
+  const el = document.getElementById('custom-sources');
+  try {
+    const r = await fetch('/api/custom-sources');
+    const sources = await r.json();
+    if (!sources.length) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <p>暂无自定义源</p>
+          <p class="hint">点击右上角"添加自定义源"开始</p>
+        </div>`;
+      return;
+    }
+    const typeLabels = {news: '新闻', blog: '博客', paper: '论文', github: 'GitHub'};
+    el.innerHTML = sources.map(s => `
+      <div class="source-card ${s.enabled ? '' : 'source-disabled'}">
+        <div class="sc-head">
+          <span class="sc-name">${s.name}</span>
+          <span class="sc-badge sc-badge-${s.source_type}">${typeLabels[s.source_type] || s.source_type}</span>
+        </div>
+        <div class="sc-url" title="${s.url}">${s.url}</div>
+        <div class="sc-actions">
+          <label class="sc-toggle">
+            <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleCustomSource('${s.name}')">
+            <span>${s.enabled ? '已启用' : '已禁用'}</span>
+          </label>
+          <button class="btn btn-ghost btn-sm" onclick="editCustomSource('${s.name}', '${s.url}', '${s.source_type}')">编辑</button>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteCustomSource('${s.name}')">删除</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+  }
+}
+
+function showAddSourceForm() {
+  document.getElementById('source-form-card').style.display = 'block';
+  document.getElementById('source-form-title').textContent = '添加自定义源';
+  document.getElementById('src-name').value = '';
+  document.getElementById('src-url').value = '';
+  document.getElementById('src-type').value = 'news';
+  document.getElementById('test-result').innerHTML = '';
+  document.getElementById('src-name').focus();
+}
+
+function hideAddSourceForm() {
+  document.getElementById('source-form-card').style.display = 'none';
+}
+
+function editCustomSource(name, url, type) {
+  document.getElementById('source-form-card').style.display = 'block';
+  document.getElementById('source-form-title').textContent = '编辑自定义源';
+  document.getElementById('src-name').value = name;
+  document.getElementById('src-url').value = url;
+  document.getElementById('src-type').value = type;
+  document.getElementById('test-result').innerHTML = '';
+}
+
+async function saveCustomSource() {
+  const name = document.getElementById('src-name').value.trim();
+  const url = document.getElementById('src-url').value.trim();
+  const type = document.getElementById('src-type').value;
+  if (!name || !url) { toast('名称和 URL 不能为空', 'warn'); return; }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    toast('URL 必须以 http:// 或 https:// 开头', 'warn'); return;
+  }
+  try {
+    const r = await fetch('/api/custom-sources', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, url, source_type: type, enabled: true}),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      toast(`自定义源 '${name}' 已保存`, 'ok');
+      hideAddSourceForm();
+      loadCustomSources();
+    } else {
+      toast('保存失败: ' + (d.detail || ''), 'error');
+    }
+  } catch (e) {
+    toast('错误: ' + e.message, 'error');
+  }
+}
+
+async function deleteCustomSource(name) {
+  if (!confirm(`确定删除自定义源 '${name}'？`)) return;
+  try {
+    const r = await fetch(`/api/custom-sources/${encodeURIComponent(name)}`, {method: 'DELETE'});
+    if (r.ok) {
+      toast(`已删除 '${name}'`, 'ok');
+      loadCustomSources();
+    } else {
+      toast('删除失败', 'error');
+    }
+  } catch (e) {
+    toast('错误: ' + e.message, 'error');
+  }
+}
+
+async function toggleCustomSource(name) {
+  try {
+    const r = await fetch(`/api/custom-sources/${encodeURIComponent(name)}/toggle`, {method: 'POST'});
+    if (r.ok) {
+      loadCustomSources();
+    } else {
+      toast('切换失败', 'error');
+    }
+  } catch (e) {
+    toast('错误: ' + e.message, 'error');
+  }
+}
+
+async function testCustomSource() {
+  const name = document.getElementById('src-name').value.trim() || 'test';
+  const url = document.getElementById('src-url').value.trim();
+  const type = document.getElementById('src-type').value;
+  if (!url) { toast('请输入 URL', 'warn'); return; }
+
+  const btn = document.getElementById('test-btn');
+  const result = document.getElementById('test-result');
+  btn.disabled = true;
+  result.innerHTML = '<span class="testing">测试中...</span>';
+
+  try {
+    const r = await fetch('/api/custom-sources/test', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, url, source_type: type, enabled: true}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      result.innerHTML = `<span class="test-ok">✓ 抓取到 ${d.items_count} 条</span>`;
+      if (d.sample && d.sample.length) {
+        result.innerHTML += `<div class="sample-list">${d.sample.map(s =>
+          `<a href="${s.url}" target="_blank" class="sample-item">${s.title}</a>`
+        ).join('')}</div>`;
+      }
+      toast(`测试成功，抓取 ${d.items_count} 条`, 'ok');
+    } else {
+      result.innerHTML = `<span class="test-fail">✕ ${d.error || '失败'}</span>`;
+      toast('测试失败', 'error');
+    }
+  } catch (e) {
+    result.innerHTML = `<span class="test-fail">✕ ${e.message}</span>`;
+    toast('错误: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ============================================================
+// 报告列表（卡片式）
+// ============================================================
+async function loadReports() {
+  const list = document.getElementById('reports-list');
+  list.innerHTML = '<div class="empty-state">加载中...</div>';
+  try {
+    const r = await fetch('/api/reports');
+    const reports = await r.json();
+    if (!reports.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+          </svg>
+          <p>尚无报告</p>
+          <p class="hint">请先发起一次搜索</p>
+        </div>`;
+      return;
+    }
+    list.innerHTML = reports.map((r, i) => {
+      const time = new Date(r.created_at).toLocaleString('zh-CN', {
+        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+      const statusBadge = r.degraded
+        ? '<span class="badge badge-warn">降级</span>'
+        : '<span class="badge badge-ok">完整</span>';
+      return `<a href="/reports/${r.run_id}" class="report-card">
+        <div class="rc-head">
+          <span class="rc-topic">${r.topic}</span>
+          ${statusBadge}
+        </div>
+        <div class="rc-stats">
+          <span><b>${r.item_count}</b> 候选</span>
+          <span><b>${r.comparison_count}</b> 对比</span>
+          <span><b>${r.elapsed_sec.toFixed(1)}s</b></span>
+        </div>
+        <div class="rc-foot">
+          <span class="rc-time">${time}</span>
+          <span class="rc-link">查阅 →</span>
+        </div>
+      </a>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+  }
+}
+
+// ============================================================
+// 配置编辑器
+// ============================================================
+async function loadConfig() {
+  const ed = document.getElementById('config-editor');
+  const msg = document.getElementById('config-msg');
+  msg.textContent = '加载中…';
+  try {
+    const r = await fetch('/api/config');
+    const cfg = await r.json();
+    ed.value = JSON.stringify(cfg, null, 2);
+    updateGutter();
+    msg.textContent = '';
+  } catch (e) {
+    msg.textContent = '✕ 加载失败';
+  }
+}
+
+function updateGutter() {
+  const ed = document.getElementById('config-editor');
+  const gutter = document.getElementById('editor-gutter');
+  const lines = ed.value.split('\n').length;
+  gutter.innerHTML = Array.from({length: lines}, (_, i) =>
+    `<div class="gutter-line">${String(i + 1).padStart(2, '0')}</div>`
+  ).join('');
+}
+
+document.getElementById('config-editor').addEventListener('input', updateGutter);
+document.getElementById('config-editor').addEventListener('scroll', (e) => {
+  document.getElementById('editor-gutter').scrollTop = e.target.scrollTop;
+});
+
+async function saveConfig() {
+  const ed = document.getElementById('config-editor');
+  const msg = document.getElementById('config-msg');
+  let cfg;
+  try { cfg = JSON.parse(ed.value); }
+  catch (e) { toast('JSON 格式错误: ' + e.message, 'error'); return; }
+  msg.textContent = '保存中…';
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({config: cfg}),
+    });
+    if (r.ok) { toast('配置已保存', 'ok'); msg.textContent = ''; }
+    else { toast('保存失败', 'error'); msg.textContent = '✕ 失败'; }
+  } catch (e) {
+    toast('错误: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+checkOllama();
+loadSources();
+setInterval(checkOllama, 30000);
+pollStatus();
+</script>
+</body>
+</html>

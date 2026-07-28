@@ -1,0 +1,19 @@
+# hotPoint 运行时依赖
+typer>=0.12
+rich>=13
+httpx>=0.27
+pydantic>=2
+pydantic-settings>=2
+pyyaml>=6
+jinja2>=3
+markdown>=3
+trafilatura>=1.12
+beautifulsoup4>=4.12
+python-dateutil>=2.9
+fastapi>=0.110
+uvicorn>=0.30
+
+# 开发/测试依赖
+pytest>=8
+pytest-asyncio>=0.23
+respx>=0.21

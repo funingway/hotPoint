@@ -53,6 +53,14 @@ class ReportConfig(BaseModel):
     db_path: str = "./hotspot.db"
 
 
+class CustomSourceConfig(BaseModel):
+    """用户自定义 Web 数据源"""
+    name: str
+    url: str
+    source_type: str = "news"  # news / paper / blog / github
+    enabled: bool = True
+
+
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="HOTSPOT_",
@@ -65,6 +73,7 @@ class AppConfig(BaseSettings):
     scoring: ScoringConfig = ScoringConfig()
     elo: EloConfig = EloConfig()
     report: ReportConfig = ReportConfig()
+    custom_sources: list[CustomSourceConfig] = []
 
 
 def load_config(path: Path | str | None = None) -> AppConfig:

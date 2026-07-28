@@ -8,3 +8,5 @@ reports/
 *.egg-info/
 build/
 dist/
+OllamaSetup.exe
+*.log

@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import re
 from datetime import datetime, timezone
@@ -69,3 +71,31 @@ class ArxivSource(BaseSource):
                 language="en",
             ))
         return items
+
+    async def filter_by_relevance(
+        self, items: list[Item], topic: str, client,
+        min_score: int = 60, concurrency: int = 4,
+    ) -> list[Item]:
+        """用 LLM 二次筛选 arXiv 论文相关度。"""
+        from hotspot.llm.prompts import build_arxiv_relevance_prompt
+
+        sem = asyncio.Semaphore(concurrency)
+
+        async def _judge(item: Item) -> tuple[Item, dict | None]:
+            prompt = build_arxiv_relevance_prompt(
+                topic=topic, title=item.title, abstract=item.raw_content,
+            )
+            async with sem:
+                try:
+                    return item, await client.chat_json(prompt)
+                except Exception:
+                    return item, None
+
+        results = await asyncio.gather(*[_judge(i) for i in items])
+        filtered = []
+        for item, result in results:
+            if not result:
+                continue
+            if result.get("relevant") and result.get("relevance_score", 0) >= min_score:
+                filtered.append(item)
+        return filtered

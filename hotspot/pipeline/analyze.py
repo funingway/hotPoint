@@ -15,7 +15,13 @@ async def run_comparisons(
     items: list[Item], topic: str, client,
     max_comparisons: int, k: int = 32, band: int = 200,
     early_stop_threshold: int = 50,
+    on_comparison=None, should_cancel=None,
 ) -> tuple[EloRanker, list[dict]]:
+    """养蛊式 Elo 对比。
+
+    on_comparison: 可选回调 (i, max_comparisons, a_item, b_item, winner_item, result_dict)
+    should_cancel: 可选无参回调，返回 True 时立即停止。
+    """
     ranker = EloRanker(initial=1000, k=k, band=band)
     for it in items:
         ranker.add(it.id)
@@ -26,6 +32,9 @@ async def run_comparisons(
 
     for i in range(max_comparisons):
         if len(items) < 2:
+            break
+        if should_cancel and should_cancel():
+            logger.info("Comparisons cancelled by user")
             break
         a_id, b_id = ranker.pick_opponents()
         if b_id is None:
@@ -45,6 +54,7 @@ async def run_comparisons(
             logger.warning(f"Comparison LLM call failed: {e}")
             continue
         winner_id = a_id if result.get("winner", "A") == "A" else b_id
+        winner_item = a_item if winner_id == a_id else b_item
         ranker.record_match(a_id, b_id, winner=winner_id)
         comparisons.append({
             "item_a_id": a_id, "item_b_id": b_id, "winner": winner_id,
@@ -52,6 +62,12 @@ async def run_comparisons(
             "a_score": result.get("a_score", 0), "b_score": result.get("b_score", 0),
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
+        if on_comparison:
+            try:
+                on_comparison(i + 1, max_comparisons,
+                              a_item, b_item, winner_item, result)
+            except Exception as cb_err:
+                logger.warning(f"on_comparison callback error: {cb_err}")
         cur_top10 = tuple(x[0] for x in ranker.top_n(10))
         if cur_top10 == last_top10:
             no_change_count += 1
