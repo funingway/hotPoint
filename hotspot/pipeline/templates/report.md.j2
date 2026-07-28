@@ -14,10 +14,10 @@
 
 ### 数据源运行状态
 
-| 源 | 状态 | 抓取数 | 错误 |
-|---|---|---|---|
+| 源 | 状态 | 抓取数 |
+|---|---|---|
 {% for s in source_statuses -%}
-| {{ s.source }} | {{ s.status }} | {{ s.fetched_count }} | {{ (s.error or "") | replace("|", "\\|") | replace("\n", " ") | truncate(120, true, "…") }} |
+| {{ s.source }} | {{ s.status }} | {{ s.fetched_count }} |
 {% endfor %}
 
 ## 二、主题概览
