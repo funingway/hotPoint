@@ -565,7 +565,102 @@ def open_browser_delayed(url: str, delay: float = 2.0):
     threading.Thread(target=_open, daemon=True).start()
 
 
+def kill_old_hotpoint_services() -> None:
+    """杀掉占用 8000-8020 的旧 hotPoint Web 服务进程。
+    通过命令行匹配 "hotspot web" 的 python 进程，避免误杀其他应用。
+    """
+    if sys.platform != "win32":
+        return
+
+    killed: list[int] = []
+    try:
+        # 用 netstat 找占用 8000-8020 的 PID
+        r = subprocess.run(
+            ["netstat", "-ano", "-p", "tcp"],
+            capture_output=True, text=True, timeout=5,
+        )
+        target_pids: set[int] = set()
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if "LISTENING" not in line:
+                continue
+            # 格式: TCP  127.0.0.1:8000  0.0.0.0:0  LISTENING  1234
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            local = parts[1]
+            pid_str = parts[-1]
+            try:
+                port = int(local.rsplit(":", 1)[-1])
+            except (ValueError, IndexError):
+                continue
+            if 8000 <= port <= 8020:
+                try:
+                    pid = int(pid_str)
+                    if pid > 0:
+                        target_pids.add(pid)
+                except ValueError:
+                    continue
+
+        # 用 wmic 过滤出命令行含 "hotspot web" 的 python 进程（精准匹配）
+        for pid in target_pids:
+            try:
+                rc = subprocess.run(
+                    ["wmic", "process", "where",
+                     f"ProcessId={pid}",
+                     "get", "CommandLine"],
+                    capture_output=True, text=True, timeout=3,
+                )
+                cmdline = rc.stdout.lower()
+                if "hotspot" in cmdline and "web" in cmdline:
+                    try:
+                        proc = subprocess.run(
+                            ["taskkill", "/PID", str(pid), "/F"],
+                            capture_output=True, text=True, timeout=3,
+                        )
+                        if proc.returncode == 0:
+                            killed.append(pid)
+                    except Exception:
+                        pass
+            except Exception:
+                continue
+
+        # 同时按命令行匹配（兜底：端口已释放但进程残留）
+        try:
+            rc = subprocess.run(
+                ["wmic", "process", "where",
+                 "Name='python.exe'",
+                 "get", "ProcessId,CommandLine"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in rc.stdout.splitlines():
+                line_lower = line.lower()
+                if "hotspot" in line_lower and "web" in line_lower:
+                    parts = line.split()
+                    try:
+                        pid = int(parts[-1])
+                        if pid != os.getpid() and pid not in killed:
+                            subprocess.run(
+                                ["taskkill", "/PID", str(pid), "/F"],
+                                capture_output=True, timeout=3,
+                            )
+                            killed.append(pid)
+                    except (ValueError, IndexError):
+                        continue
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    if killed:
+        print(f"[清理] 已停止 {len(killed)} 个旧 hotPoint 服务进程: {killed}")
+        time.sleep(0.5)  # 等端口完全释放
+
+
 def launch_web():
+    # 启动前自动清理旧服务，确保端口 8000 可用、看到的是最新代码
+    kill_old_hotpoint_services()
+
     port = find_available_port(WEB_PORT)
     if port != WEB_PORT:
         print(f"[!] 端口 {WEB_PORT} 被占用，自动切换到 {port}")
