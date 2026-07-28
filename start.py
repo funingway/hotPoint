@@ -25,6 +25,10 @@ VENV_DIR = PROJECT_DIR / ".venv"
 REQUIREMENTS_FILE = PROJECT_DIR / "requirements.txt"
 OLLAMA_INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
 OLLAMA_INSTALLER_PATH = PROJECT_DIR / "OllamaSetup.exe"
+# 项目级 Python 环境配置文件：内容可以是 conda 环境名或 python 绝对路径
+ENV_CONFIG_FILE = PROJECT_DIR / ".python-env"
+# 与项目相关的 conda 环境名候选（自动匹配用）
+PROJECT_ENV_KEYWORDS = ("hot", "hotpoint", "hotspot")
 
 # Windows 控制台 UTF-8 输出
 if sys.platform == "win32":
@@ -69,59 +73,151 @@ def get_venv_python() -> str:
     return str(VENV_DIR / "bin" / "python")
 
 
-def relaunch_in_venv() -> int:
-    """用 .venv 的 python 重新启动 start.py"""
-    py = get_venv_python()
-    print(f"[OK] 使用虚拟环境: {VENV_DIR}")
-    return subprocess.call([py, str(Path(__file__).resolve())])
+def relaunch_with_python(python_path: str, env_label: str = "") -> int:
+    """用指定 python 重新启动 start.py"""
+    print(f"[OK] 使用环境: {env_label or python_path}")
+    return subprocess.call([python_path, str(Path(__file__).resolve())])
 
 
 # ============================================================
-# 系统Python查找
+# Conda 环境扫描
 # ============================================================
-def find_system_python() -> str | None:
-    """找一个可用的系统 Python（>=3.10）"""
-    candidates: list[str] = [sys.executable]
-    for name in ("python", "python3", "py"):
-        p = shutil.which(name)
-        if p:
-            candidates.append(p)
-    # 常见 conda / 官方安装路径
-    common_paths = [
-        r"D:\ProgramData\anaconda3\python.exe",
-        r"C:\ProgramData\anaconda3\python.exe",
-        r"C:\ProgramData\miniconda3\python.exe",
-        os.path.expandvars(r"C:\Users\%USERNAME%\anaconda3\python.exe"),
-        os.path.expandvars(r"C:\Users\%USERNAME%\miniconda3\python.exe"),
-        os.path.expandvars(r"C:\Python310\python.exe"),
-        os.path.expandvars(r"C:\Python311\python.exe"),
-        os.path.expandvars(r"C:\Python312\python.exe"),
-        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python310\python.exe"),
-        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python311\python.exe"),
-        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python312\python.exe"),
+def find_conda() -> str | None:
+    """查找 conda 可执行文件"""
+    # 1. PATH 中的 conda
+    c = shutil.which("conda")
+    if c:
+        return c
+    # 2. 常见安装路径
+    candidates = [
+        r"D:\ProgramData\anaconda3\Scripts\conda.exe",
+        r"D:\ProgramData\miniconda3\Scripts\conda.exe",
+        r"C:\ProgramData\anaconda3\Scripts\conda.exe",
+        r"C:\ProgramData\miniconda3\Scripts\conda.exe",
+        os.path.expandvars(r"C:\Users\%USERNAME%\anaconda3\Scripts\conda.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\miniconda3\Scripts\conda.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\miniconda3\condabin\conda.bat"),
     ]
-    for c in common_paths:
+    for c in candidates:
         if Path(c).exists():
-            candidates.append(c)
-
-    seen: set[str] = set()
-    for cand in candidates:
-        cand = os.path.abspath(cand)
-        if cand in seen:
-            continue
-        seen.add(cand)
-        try:
-            r = subprocess.run(
-                [cand, "-c", "import sys; print(sys.version_info[:2])"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if r.returncode == 0:
-                ver = eval(r.stdout.strip())
-                if isinstance(ver, tuple) and ver >= (3, 10):
-                    return cand
-        except Exception:
-            continue
+            return c
     return None
+
+
+def list_conda_envs() -> dict[str, str]:
+    """返回 {env_name: python_path}，扫描所有 conda 环境"""
+    conda = find_conda()
+    if not conda:
+        return {}
+    try:
+        r = subprocess.run(
+            [conda, "env", "list"],
+            capture_output=True, text=True, timeout=10,
+        )
+        envs: dict[str, str] = {}
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            # 格式: name path  或  name path  *  (当前激活)
+            if len(parts) >= 2:
+                name = parts[0]
+                path = parts[1]
+                if name == "base" or Path(path).exists():
+                    if sys.platform == "win32":
+                        py = Path(path) / "python.exe"
+                    else:
+                        py = Path(path) / "bin" / "python"
+                    if py.exists():
+                        envs[name] = str(py)
+        return envs
+    except Exception:
+        return {}
+
+
+def check_python_version(python_path: str, min_ver: tuple = (3, 10)) -> bool:
+    """检查指定 python 是否 >= min_ver"""
+    try:
+        r = subprocess.run(
+            [python_path, "-c", "import sys; print(sys.version_info[:2])"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            ver = eval(r.stdout.strip())
+            if isinstance(ver, tuple) and ver >= min_ver:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def check_hotspot_installed(python_path: str) -> bool:
+    """检查指定 python 是否已安装 hotspot 包（判断环境是否已配置好）"""
+    try:
+        r = subprocess.run(
+            [python_path, "-c", "import hotspot; print(hotspot.__file__)"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+# ============================================================
+# 项目环境自动匹配
+# ============================================================
+def read_env_config() -> str | None:
+    """读取项目级环境配置文件 .python-env
+    内容可以是：
+      - conda 环境名（如 hot_env）
+      - python 绝对路径
+    """
+    if not ENV_CONFIG_FILE.exists():
+        return None
+    try:
+        content = ENV_CONFIG_FILE.read_text(encoding="utf-8").strip()
+        return content if content else None
+    except Exception:
+        return None
+
+
+def write_env_config(value: str) -> None:
+    """写入项目级环境配置"""
+    ENV_CONFIG_FILE.write_text(value + "\n", encoding="utf-8")
+
+
+def find_project_python() -> tuple[str | None, str]:
+    """按优先级查找项目应使用的 Python 环境。
+    返回 (python_path, env_label)
+    """
+    # 1. 项目配置文件 .python-env
+    cfg = read_env_config()
+    if cfg:
+        # 如果是绝对路径
+        if Path(cfg).exists() and Path(cfg).is_file():
+            return cfg, f"配置文件指定: {cfg}"
+        # 否则当作 conda 环境名
+        envs = list_conda_envs()
+        if cfg in envs:
+            return envs[cfg], f"conda 环境: {cfg}"
+        # 也可能是相对路径
+        p = PROJECT_DIR / cfg
+        if p.exists() and p.is_file():
+            return str(p), f"配置文件指定: {cfg}"
+
+    # 2. 项目下 .venv
+    if venv_python_exists():
+        return get_venv_python(), f".venv: {VENV_DIR}"
+
+    # 3. 扫描 conda 环境，匹配项目相关名称
+    envs = list_conda_envs()
+    for keyword in PROJECT_ENV_KEYWORDS:
+        for name, py in envs.items():
+            if keyword in name.lower():
+                return py, f"conda 环境: {name}"
+
+    return None, ""
 
 
 # ============================================================
@@ -137,13 +233,11 @@ def create_venv(base_python: str) -> bool:
     return True
 
 
-def install_requirements() -> bool:
-    py = get_venv_python()
-    print("[安装] 依赖包（requirements.txt）...")
-    r = subprocess.run(
-        [py, "-m", "pip", "install", "--upgrade", "pip"],
-        capture_output=True,
-    )
+def install_requirements(python_path: str | None = None) -> bool:
+    py = python_path or get_venv_python()
+    print(f"[安装] 依赖包（requirements.txt）到 {py} ...")
+    subprocess.run([py, "-m", "pip", "install", "--upgrade", "pip"],
+                   capture_output=True)
     r = subprocess.run(
         [py, "-m", "pip", "install", "-r", str(REQUIREMENTS_FILE)],
     )
@@ -273,35 +367,150 @@ def pull_model(model: str) -> bool:
 
 
 # ============================================================
-# 一键安装
+# 交互式环境选择
 # ============================================================
-def one_click_install() -> bool:
+def find_system_python() -> str | None:
+    """找一个可用的系统 Python（>=3.10），用于创建 .venv"""
+    candidates: list[str] = []
+    # py launcher 优先
+    for name in ("py", "python", "python3"):
+        p = shutil.which(name)
+        if p:
+            candidates.append(p)
+    # conda base
+    conda = find_conda()
+    if conda:
+        envs = list_conda_envs()
+        if "base" in envs:
+            candidates.append(envs["base"])
+    # 常见安装路径
+    common_paths = [
+        r"D:\ProgramData\anaconda3\python.exe",
+        r"C:\ProgramData\anaconda3\python.exe",
+        r"C:\ProgramData\miniconda3\python.exe",
+        os.path.expandvars(r"C:\Users\%USERNAME%\anaconda3\python.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\miniconda3\python.exe"),
+        os.path.expandvars(r"C:\Python310\python.exe"),
+        os.path.expandvars(r"C:\Python311\python.exe"),
+        os.path.expandvars(r"C:\Python312\python.exe"),
+        os.path.expandvars(r"C:\Python313\python.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python310\python.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python311\python.exe"),
+        os.path.expandvars(r"C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python312\python.exe"),
+    ]
+    for c in common_paths:
+        if Path(c).exists():
+            candidates.append(c)
+
+    seen: set[str] = set()
+    for cand in candidates:
+        cand = os.path.abspath(cand)
+        if cand in seen:
+            continue
+        seen.add(cand)
+        if check_python_version(cand):
+            return cand
+    return None
+
+
+def interactive_select_env() -> tuple[str | None, str, str]:
+    """交互式选择 Python 环境。
+    返回 (python_path, env_label, env_config_value_to_save)
+    env_config_value_to_save 为空字符串则不保存配置
+    """
     print()
     print("-" * 60)
-    print("  一键安装配置环境")
+    print("  选择 Python 环境")
     print("-" * 60)
 
-    # 1. 找系统 Python
-    base_py = find_system_python()
-    if not base_py:
-        print("[错误] 找不到 Python >= 3.10")
-        print("       请从 https://www.python.org 安装 Python 3.10+ 后重试")
-        input("按回车退出...")
-        return False
-    print(f"[OK] 检测到系统 Python: {base_py}")
+    # 收集所有候选环境
+    options: list[tuple[str, str, str]] = []  # (python_path, label, config_value)
 
-    # 2. 创建 venv
-    if not venv_python_exists():
-        if not create_venv(base_py):
+    # 1. 项目下 .venv
+    if venv_python_exists():
+        py = get_venv_python()
+        ok = check_hotspot_installed(py)
+        tag = " (已装 hotspot)" if ok else " (未装依赖)"
+        options.append((py, f".venv 项目虚拟环境{tag}", ".venv"))
+
+    # 2. 所有 conda 环境
+    conda_envs = list_conda_envs()
+    for name, py in conda_envs.items():
+        ver_ok = check_python_version(py)
+        if not ver_ok:
+            continue
+        installed = check_hotspot_installed(py)
+        tag = " (已装 hotspot)" if installed else ""
+        mark = " ★" if any(k in name.lower() for k in PROJECT_ENV_KEYWORDS) else ""
+        options.append((py, f"conda: {name}{tag}{mark}", name))
+
+    # 3. 系统 Python（用于新建 .venv）
+    base_py = find_system_python()
+    if base_py:
+        options.append((base_py, "新建 .venv 虚拟环境（推荐，隔离干净）", "NEW_VENV"))
+
+    if not options:
+        print("[错误] 找不到任何 Python >= 3.10")
+        print("       请从 https://www.python.org 安装 Python 3.10+ 后重试")
+        return None, "", ""
+
+    # 打印选项
+    print()
+    for i, (py, label, _) in enumerate(options, 1):
+        print(f"  [{i}] {label}")
+        print(f"      {py}")
+    print(f"  [0] 退出")
+    print()
+
+    choice = input(f"请选择 (0-{len(options)}，默认 1): ").strip()
+    if choice == "0":
+        return None, "", ""
+    try:
+        idx = int(choice) if choice else 1
+        if idx < 1 or idx > len(options):
+            raise ValueError()
+    except ValueError:
+        print("[错误] 无效选择")
+        return None, "", ""
+    return options[idx - 1]
+
+
+# ============================================================
+# 一键安装
+# ============================================================
+def one_click_install(python_path: str, env_label: str,
+                      env_config_value: str) -> bool:
+    print()
+    print("-" * 60)
+    print(f"  配置环境: {env_label}")
+    print("-" * 60)
+    print(f"[OK] Python: {python_path}")
+
+    # 如果选了新建 .venv
+    if env_config_value == "NEW_VENV":
+        if not venv_python_exists():
+            if not create_venv(python_path):
+                return False
+        python_path = get_venv_python()
+        env_config_value = ".venv"
+        print(f"[OK] 切换到 .venv: {python_path}")
+
+    # 安装依赖
+    if not check_hotspot_installed(python_path):
+        if not install_requirements(python_path):
             return False
     else:
-        print(f"[OK] 虚拟环境已存在: {VENV_DIR}")
+        print("[OK] hotspot 依赖已安装")
 
-    # 3. 安装依赖
-    if not install_requirements():
-        return False
+    # 保存配置（下次自动使用）
+    if env_config_value and env_config_value != "NEW_VENV":
+        try:
+            write_env_config(env_config_value)
+            print(f"[OK] 已记住环境选择（写入 {ENV_CONFIG_FILE.name}），下次自动使用")
+        except Exception as e:
+            print(f"[提示] 保存环境配置失败: {e}（不影响本次运行）")
 
-    # 4. Ollama
+    # Ollama
     print()
     print("[检查] Ollama 状态...")
     if not ollama_available():
@@ -312,11 +521,9 @@ def one_click_install() -> bool:
         else:
             print("[提示] 可稍后手动安装: https://ollama.com/download")
 
-    # 5. 启动 Ollama 服务
     if ollama_available():
         start_ollama_service()
 
-    # 6. 拉取模型
     model = DEFAULT_MODEL
     if ollama_service_running():
         if not check_model(model):
@@ -387,39 +594,75 @@ def main():
     os.chdir(str(PROJECT_DIR))
     print_banner()
 
-    # 情况 1：已在虚拟环境中运行
+    # 情况 1：已在虚拟环境中运行 → 直接启动
     if in_virtualenv():
         env_name = os.environ.get("VIRTUAL_ENV") or \
                    os.environ.get("CONDA_PREFIX") or sys.prefix
-        print(f"[OK] 当前虚拟环境: {env_name}")
+        print(f"[OK] 当前环境: {env_name}")
+        # 检查依赖
+        if not check_hotspot_installed(sys.executable):
+            print("[!] 当前环境未安装 hotspot 依赖，开始安装...")
+            if not install_requirements(sys.executable):
+                print("[错误] 依赖安装失败，请手动执行: "
+                      f"{sys.executable} -m pip install -r requirements.txt")
+                input("按回车退出...")
+                return
         launch_web()
         return
 
-    # 情况 2：.venv 已存在但当前不在其中 → 用 .venv 重启
-    if venv_python_exists():
-        relaunch_in_venv()
+    # 情况 2：自动查找项目环境（配置文件 / .venv / conda 环境名匹配）
+    project_py, env_label = find_project_python()
+    if project_py:
+        # 找到了，检查依赖是否装好
+        if check_hotspot_installed(project_py):
+            print(f"[OK] 检测到项目环境: {env_label}")
+            relaunch_with_python(project_py, env_label)
+            return
+        else:
+            # 找到环境但没装依赖 → 询问是否安装
+            print(f"[!] 检测到环境: {env_label}")
+            print(f"    但尚未安装 hotspot 依赖")
+            ans = input("    是否现在安装依赖？(y/n，默认 y): ").strip().lower()
+            if ans in ("", "y", "yes"):
+                if install_requirements(project_py):
+                    relaunch_with_python(project_py, env_label)
+                    return
+            # 拒绝安装则进入交互选择
+            print("[提示] 进入手动选择模式...")
+
+    # 情况 3：交互式选择环境
+    py, label, cfg_val = interactive_select_env()
+    if not py:
+        print("[退出] 用户取消")
         return
 
-    # 情况 3：无虚拟环境 → 交互提示
-    print()
-    print("[!] 未检测到 Python 虚拟环境")
-    print("    hotPoint 推荐在独立虚拟环境中运行，避免污染系统 Python")
-    print()
-    print("    [1] 一键安装配置环境（创建 .venv + 安装依赖 + 检测/安装 Ollama）")
-    print("    [2] 退出")
-    print()
-    choice = input("请选择 (1/2，默认 1): ").strip()
-    if choice in ("", "1"):
-        if one_click_install():
-            if venv_python_exists():
-                print()
-                print("[启动] 使用新创建的虚拟环境启动 hotPoint...")
-                relaunch_in_venv()
-        else:
-            print("[错误] 安装未完成，请根据提示修复后重试")
-            input("按回车退出...")
+    # 如果选的环境已装好依赖，直接启动
+    if check_hotspot_installed(py) or cfg_val == "":
+        # cfg_val=="" 表示选了已装好的环境（理论上 options 里 tag 都标了）
+        if check_hotspot_installed(py):
+            if cfg_val and cfg_val != "NEW_VENV":
+                try:
+                    write_env_config(cfg_val)
+                except Exception:
+                    pass
+            relaunch_with_python(py, label)
+            return
+
+    # 需要安装
+    if one_click_install(py, label, cfg_val):
+        # 安装完成后用目标 python 重启
+        final_py = get_venv_python() if cfg_val in ("NEW_VENV", ".venv") else py
+        if cfg_val and cfg_val != "NEW_VENV":
+            try:
+                write_env_config(cfg_val)
+            except Exception:
+                pass
+        print()
+        print("[启动] 使用配置好的环境启动 hotPoint...")
+        relaunch_with_python(final_py, label)
     else:
-        print("[退出] 用户取消")
+        print("[错误] 安装未完成，请根据提示修复后重试")
+        input("按回车退出...")
 
 
 if __name__ == "__main__":
