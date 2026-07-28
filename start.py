@@ -590,21 +590,35 @@ def launch_web():
 # ============================================================
 # 主流程
 # ============================================================
+def _same_python(a: str, b: str) -> bool:
+    """比较两个 python 路径是否指向同一个文件（规范化 + 不区分大小写）"""
+    try:
+        pa = Path(a).resolve()
+        pb = Path(b).resolve()
+        return pa == pb or pa.name.lower() == pb.name.lower() and \
+               pa.stat().st_size == pb.stat().st_size
+    except Exception:
+        return os.path.normcase(os.path.abspath(a)) == \
+               os.path.normcase(os.path.abspath(b))
+
+
 def main():
     os.chdir(str(PROJECT_DIR))
     print_banner()
 
-    # 情况 1：已在虚拟环境中运行 → 直接启动
+    current_py = sys.executable
+    print(f"[i] 当前 Python: {current_py}")
+
+    # 情况 1：已在虚拟环境中运行（venv/conda 已激活）→ 直接启动
     if in_virtualenv():
         env_name = os.environ.get("VIRTUAL_ENV") or \
                    os.environ.get("CONDA_PREFIX") or sys.prefix
         print(f"[OK] 当前环境: {env_name}")
-        # 检查依赖
-        if not check_hotspot_installed(sys.executable):
+        if not check_hotspot_installed(current_py):
             print("[!] 当前环境未安装 hotspot 依赖，开始安装...")
-            if not install_requirements(sys.executable):
+            if not install_requirements(current_py):
                 print("[错误] 依赖安装失败，请手动执行: "
-                      f"{sys.executable} -m pip install -r requirements.txt")
+                      f"{current_py} -m pip install -r requirements.txt")
                 input("按回车退出...")
                 return
         launch_web()
@@ -613,7 +627,22 @@ def main():
     # 情况 2：自动查找项目环境（配置文件 / .venv / conda 环境名匹配）
     project_py, env_label = find_project_python()
     if project_py:
-        # 找到了，检查依赖是否装好
+        # 关键防死循环：如果当前 python 已经是项目 python（如 conda 环境未激活但
+        # 直接用其 python.exe 运行），直接启动，不再 relaunch
+        if _same_python(current_py, project_py):
+            print(f"[OK] 当前即为项目环境: {env_label}")
+            if check_hotspot_installed(current_py):
+                launch_web()
+                return
+            print("[!] 未安装 hotspot 依赖，开始安装...")
+            if install_requirements(current_py):
+                launch_web()
+                return
+            print("[错误] 依赖安装失败")
+            input("按回车退出...")
+            return
+
+        # 当前 python 不是项目 python → 用项目 python 重启
         if check_hotspot_installed(project_py):
             print(f"[OK] 检测到项目环境: {env_label}")
             relaunch_with_python(project_py, env_label)
@@ -627,7 +656,6 @@ def main():
                 if install_requirements(project_py):
                     relaunch_with_python(project_py, env_label)
                     return
-            # 拒绝安装则进入交互选择
             print("[提示] 进入手动选择模式...")
 
     # 情况 3：交互式选择环境
@@ -636,30 +664,44 @@ def main():
         print("[退出] 用户取消")
         return
 
-    # 如果选的环境已装好依赖，直接启动
-    if check_hotspot_installed(py) or cfg_val == "":
-        # cfg_val=="" 表示选了已装好的环境（理论上 options 里 tag 都标了）
-        if check_hotspot_installed(py):
-            if cfg_val and cfg_val != "NEW_VENV":
-                try:
-                    write_env_config(cfg_val)
-                except Exception:
-                    pass
-            relaunch_with_python(py, label)
-            return
+    # 防死循环：如果选的环境就是当前 python，直接启动
+    if _same_python(current_py, py) and check_hotspot_installed(py):
+        if cfg_val and cfg_val not in ("NEW_VENV",):
+            try:
+                write_env_config(cfg_val)
+            except Exception:
+                pass
+        print(f"[OK] 使用当前环境: {label}")
+        launch_web()
+        return
+
+    # 如果选的环境已装好依赖，relaunch
+    if check_hotspot_installed(py):
+        if cfg_val and cfg_val != "NEW_VENV":
+            try:
+                write_env_config(cfg_val)
+            except Exception:
+                pass
+        relaunch_with_python(py, label)
+        return
 
     # 需要安装
     if one_click_install(py, label, cfg_val):
-        # 安装完成后用目标 python 重启
         final_py = get_venv_python() if cfg_val in ("NEW_VENV", ".venv") else py
         if cfg_val and cfg_val != "NEW_VENV":
             try:
                 write_env_config(cfg_val)
             except Exception:
                 pass
-        print()
-        print("[启动] 使用配置好的环境启动 hotPoint...")
-        relaunch_with_python(final_py, label)
+        # 防死循环：如果 final_py 就是当前 python，直接启动
+        if _same_python(current_py, final_py):
+            print()
+            print("[启动] 启动 hotPoint...")
+            launch_web()
+        else:
+            print()
+            print("[启动] 使用配置好的环境启动 hotPoint...")
+            relaunch_with_python(final_py, label)
     else:
         print("[错误] 安装未完成，请根据提示修复后重试")
         input("按回车退出...")
