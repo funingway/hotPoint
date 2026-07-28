@@ -62,7 +62,8 @@ class RedditSource(BaseSource):
     async def fetch(self, topic: str, hours: int) -> list[Item]:
         results: list[Item] = []
         async with httpx.AsyncClient(
-            timeout=30.0, headers={"User-Agent": "hotspot-crawler/0.1"},
+            timeout=10.0, follow_redirects=True,
+            headers={"User-Agent": "hotpoint/1.0 (research crawler; +https://github.com/funingway/hotPoint)"},
         ) as client:
             for sub in self.subreddits:
                 results.extend(await self._search_sub(client, sub, topic, hours))

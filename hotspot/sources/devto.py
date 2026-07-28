@@ -12,7 +12,7 @@ API = "https://dev.to/api/articles"
 class DevtoSource(BaseSource):
     name = "devto"
 
-    def __init__(self, min_reactions: int = 50, rate_limit: float = 1.0, **_):
+    def __init__(self, min_reactions: int = 5, rate_limit: float = 1.0, **_):
         self.min_reactions = min_reactions
         self._limiter = RateLimiter(rate_limit)
 

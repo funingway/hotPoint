@@ -9,7 +9,7 @@ from hotspot.models import Item, SourceType
 from hotspot.sources import register_source
 from hotspot.sources.base import BaseSource, RateLimiter
 
-API_URL = "http://export.arxiv.org/api/query"
+API_URL = "https://export.arxiv.org/api/query"
 NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 
@@ -29,7 +29,7 @@ class ArxivSource(BaseSource):
             "max_results": str(self.max_results),
         }
         await self._limiter.acquire()
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.get(API_URL, params=params)
             resp.raise_for_status()
             text = resp.text

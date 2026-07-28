@@ -32,7 +32,7 @@ async def test_fetch_parses_atom_feed():
     recent_a = (datetime.now(timezone.utc) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent_b = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     atom_xml = _build_atom_xml(recent_a, recent_b)
-    respx.get("http://export.arxiv.org/api/query").respond(text=atom_xml)
+    respx.get("https://export.arxiv.org/api/query").respond(text=atom_xml)
     src = ArxivSource(max_results=50, rate_limit=10.0)
     items = await src.fetch("world models", hours=48)
     assert len(items) == 2

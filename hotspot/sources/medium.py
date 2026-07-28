@@ -12,14 +12,14 @@ from hotspot.sources.base import BaseSource, RateLimiter
 class MediumSource(BaseSource):
     name = "medium"
 
-    def __init__(self, min_claps: int = 100, rate_limit: float = 1.0, **_):
+    def __init__(self, min_claps: int = 10, rate_limit: float = 1.0, **_):
         self.min_claps = min_claps
         self._limiter = RateLimiter(rate_limit)
 
     async def fetch(self, topic: str, hours: int) -> list[Item]:
         url = f"https://medium.com/feed/tag/{topic}"
         await self._limiter.acquire()
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             text = resp.text
