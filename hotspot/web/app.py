@@ -35,6 +35,7 @@ import hotspot.sources.github       # noqa: F401
 import hotspot.sources.medium       # noqa: F401
 import hotspot.sources.devto        # noqa: F401
 import hotspot.sources.web          # noqa: F401
+import hotspot.sources.conferences  # noqa: F401
 from hotspot.llm.ollama_client import OllamaClient
 from hotspot.storage.sqlite_index import SqliteIndex
 from hotspot.storage.report_files import build_report_path, save_report_file

@@ -31,12 +31,16 @@ sources:
     token_env: "GITHUB_TOKEN"
   medium:
     enabled: true
-    min_claps: 100
+    min_claps: 10
     rate_limit: 1.0
   devto:
     enabled: true
-    min_reactions: 50
+    min_reactions: 5
     rate_limit: 1.0
+  conferences:
+    enabled: true
+    per_venue: 15
+    rate_limit: 2.0
 
 scoring:
   freshness: 0.30
